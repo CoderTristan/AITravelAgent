@@ -1,29 +1,47 @@
 import ollama
+import requests
 
-# 1. Define a normal Python function you want your agent to use
-def get_current_weather(city: str) -> str:
-    """Get the current weather for a specific city."""
-    # (In a real project, you would call a real weather API here)
-    return f"The weather in {city} is 22°C and sunny."
+def get_live_weather(city: str) -> str:
+    """Fetch real-time weather for a given city using the Open-Meteo API."""
+    try:
+        # 1. Convert city name to latitude and longitude using Open-Meteo Geocoding
+        geo_url = f"https://geocoding-api.open-meteo.com/v1/search?name={city}&count=1"
+        geo_res = requests.get(geo_url).json()
+        
+        if not geo_res.get("results"):
+            return f"Could not find coordinates for {city}."
+            
+        location = geo_res["results"][0]
+        lat, lon = location["latitude"], location["longitude"]
+        name = location["name"]
+        country = location.get("country", "")
 
-# 2. Ask the model a question and pass the function into the 'tools' list
+        # 2. Fetch the live weather using those coordinates
+        weather_url = f"https://api.open-meteo.com/v1/forecast?latitude={lat}&longitude={lon}&current=temperature_2m,weather_code"
+        weather_res = requests.get(weather_url).json()
+        
+        temp = weather_res["current"]["temperature_2m"]
+        
+        return f"The current live temperature in {name}, {country} is {temp}°C."
+        
+    except Exception as e:
+        return f"Error fetching weather data: {str(e)}"
+
+# 3. Ask Qwen a question, passing the live function as a tool
 response = ollama.chat(
     model='qwen3:8b',
     messages=[
-        {'role': 'user', 'content': 'What is the weather like in Tokyo right now?'}
+        {'role': 'user', 'content': 'What is the live weather in Paris right now?'}
     ],
-    tools=[get_current_weather], # Ollama automatically generates the schema for this function!
+    tools=[get_live_weather],
 )
 
-# 3. Check if the model decided to call the function
+# 4. Handle the tool execution loop
 if response.message.tool_calls:
     for tool in response.message.tool_calls:
-        print(f"🤖 Agent decided to call function: {tool.function.name}")
-        print(f"📦 With arguments: {tool.function.arguments}")
-        
-        # Execute your local Python function with the arguments Qwen chose
-        if tool.function.name == 'get_current_weather':
-            result = get_current_weather(**tool.function.arguments)
-            print(f"⚙️ Function Output: {result}")
+        if tool.function.name == 'get_live_weather':
+            # Execute the function using the arguments Qwen extracted
+            api_result = get_live_weather(**tool.function.arguments)
+            print(f"🌍 API Result: {api_result}")
 else:
     print(response.message.content)

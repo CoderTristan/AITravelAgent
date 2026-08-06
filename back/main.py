@@ -7,6 +7,7 @@ from pydantic import BaseModel
 import ollama
 import secrets
 from contextlib import asynccontextmanager
+from tools.rules import detect_required_tools
 
 from db import init_table, save_message, get_chat_history
 from auth import (
@@ -112,7 +113,11 @@ async def chat(
 ):
     user_id = user["user_id"]
 
-    save_message(user_id, "user", request.message)
+    save_message(
+        user_id,
+        "user",
+        request.message
+    )
 
     messages = [
         {
@@ -120,15 +125,59 @@ async def chat(
             "content": SYSTEM_PROMPT,
         }
     ]
-    messages.extend(get_chat_history(user_id))
+
+    messages.extend(
+        get_chat_history(user_id)
+    )
+
+
+    agent_state = {
+        "tools_used": [],
+        "tool_results": []
+    }
+
+
+    required_tools = detect_required_tools(
+        request.message
+    )
+
+    if required_tools:
+
+        messages.append(
+            {
+                "role": "system",
+                "content": f"""
+The user request likely requires these tools:
+
+{required_tools}
+
+Use tools when they provide verified information.
+Do not answer using assumptions.
+"""
+            }
+        )
+
 
     async_ollama = ollama.AsyncClient()
 
-    ai_reply = "Sorry, I couldn't complete your request."
+
+    ai_reply = (
+        "I could not complete your request."
+    )
+
+
+    tool_failures = 0
+
 
     try:
+
         for round_num in range(MAX_TOOL_ROUNDS):
-            
+
+            print(
+                f"\n===== Agent Round {round_num + 1} ====="
+            )
+
+
             response = await async_ollama.chat(
                 model="qwen2.5:7b",
                 messages=messages,
@@ -138,51 +187,195 @@ async def chat(
                 ],
             )
 
-            messages.append(response.message)
 
+            messages.append(
+                response.message
+            )
+
+
+            # Model finished gathering information
             if not response.message.tool_calls:
-                ai_reply = response.message.content
+
+                ai_reply = (
+                    response.message.content
+                )
+
                 break
 
-            print(f"\n--- Tool Round {round_num + 1} ---")
+
 
             for tool_call in response.message.tool_calls:
 
-                tool_name = tool_call.function.name
-                tool_function = TOOLS.get(tool_name)
+                tool_name = (
+                    tool_call.function.name
+                )
+
+                arguments = (
+                    tool_call.function.arguments
+                )
+
+
+                print(
+                    f"Tool requested: {tool_name}"
+                )
+
+                print(
+                    f"Arguments: {arguments}"
+                )
+
+
+                tool_function = TOOLS.get(
+                    tool_name
+                )
+
 
                 if tool_function is None:
-                    print(f"Unknown tool: {tool_name}")
 
-                    messages.append({
+                    result = (
+                        f"Tool {tool_name} does not exist."
+                    )
+
+                    tool_failures += 1
+
+
+                else:
+
+                    try:
+
+                        result = await tool_function(
+                            **arguments
+                        )
+
+
+                        agent_state[
+                            "tools_used"
+                        ].append(
+                            tool_name
+                        )
+
+
+                        agent_state[
+                            "tool_results"
+                        ].append(
+                            {
+                                "tool": tool_name,
+                                "result": result
+                            }
+                        )
+
+
+                    except Exception as e:
+
+                        tool_failures += 1
+
+                        result = (
+                            f"Tool failed: {str(e)}"
+                        )
+
+
+                messages.append(
+                    {
                         "role": "tool",
                         "name": tool_name,
-                        "content": f"Tool '{tool_name}' does not exist."
-                    })
-                    continue
+                        "content": str(result),
+                    }
+                )
 
-                print(f"Tool: {tool_name}")
-                print(f"Arguments: {tool_call.function.arguments}")
 
-                try:
-                    result = await tool_function(
-                        **tool_call.function.arguments
-                    )
-                except Exception as e:
-                    result = f"Tool failed: {str(e)}"
+            if tool_failures >= 3:
 
-                messages.append({
-                    "role": "tool",
-                    "tool_name": tool_name,
-                    "content": result,
-                })
+                ai_reply = """
+I am currently unable to retrieve reliable live information.
+
+Please try again later.
+"""
+
+                break
+
+
 
         else:
-            ai_reply = "I reached the maximum number of tool calls before finishing."
 
-        save_message(user_id, "assistant", ai_reply)
+            ai_reply = """
+I was unable to finish gathering enough information.
+"""
 
-        return {"reply": ai_reply}
+
+
+        # ==============================
+        # FINAL VALIDATION PASS
+        # ==============================
+
+        validation_prompt = f"""
+
+You are the final accuracy checker.
+
+Verify this answer:
+
+{ai_reply}
+
+
+Available verified tool data:
+
+{agent_state["tool_results"]}
+
+
+Rules:
+
+- Remove any unsupported facts.
+- Never invent locations, weather, prices, events, or businesses.
+- Only keep information supported by tool results.
+- If information is missing, say so.
+
+Return only the corrected final answer.
+
+"""
+
+
+        validation = await async_ollama.chat(
+            model="qwen2.5:7b",
+            messages=[
+                {
+                    "role": "system",
+                    "content": validation_prompt
+                }
+            ]
+        )
+
+
+        ai_reply = (
+            validation.message.content
+        )
+
+
+
+        save_message(
+            user_id,
+            "assistant",
+            ai_reply
+        )
+
+
+        print(
+            "Tools used:",
+            agent_state["tools_used"]
+        )
+
+
+        return {
+            "reply": ai_reply
+        }
+
+
 
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
+        print(
+            "CHAT ERROR:",
+            e
+        )
+
+        raise HTTPException(
+            status_code=500,
+            detail=str(e)
+        )

@@ -1,5 +1,9 @@
-from tools.registry import TOOLS
-from fastapi import FastAPI, HTTPException, Depends, Request, Response
+import time
+from tools.registry import (
+    get_tool_schemas,
+    get_tool_function
+)
+from fastapi import FastAPI, HTTPException, Depends, Request
 from fastapi.responses import RedirectResponse
 from prompts import SYSTEM_PROMPT
 from fastapi.middleware.cors import CORSMiddleware
@@ -7,8 +11,6 @@ from pydantic import BaseModel
 import ollama
 import secrets
 from contextlib import asynccontextmanager
-from tools.rules import detect_required_tools
-
 from db import init_table, save_message, get_chat_history
 from auth import (
     GOOGLE_CLIENT_ID, 
@@ -33,7 +35,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MAX_TOOL_ROUNDS = 5
+MAX_TOOL_ROUNDS = 8
 
 @app.get("/api/auth/login")
 def login_with_google():
@@ -111,7 +113,9 @@ async def chat(
     request: QueryRequest,
     user: dict = Depends(verify_jwt_token)
 ):
+
     user_id = user["user_id"]
+
 
     save_message(
         user_id,
@@ -119,43 +123,25 @@ async def chat(
         request.message
     )
 
+
     messages = [
         {
             "role": "system",
-            "content": SYSTEM_PROMPT,
+            "content": SYSTEM_PROMPT
         }
     ]
 
+
+    history = get_chat_history(user_id)
+
+    user_history = [
+        msg for msg in history
+        if msg["role"] == "user"
+    ]
+
     messages.extend(
-        get_chat_history(user_id)
+        user_history[-1:]
     )
-
-
-    agent_state = {
-        "tools_used": [],
-        "tool_results": []
-    }
-
-
-    required_tools = detect_required_tools(
-        request.message
-    )
-
-    if required_tools:
-
-        messages.append(
-            {
-                "role": "system",
-                "content": f"""
-The user request likely requires these tools:
-
-{required_tools}
-
-Use tools when they provide verified information.
-Do not answer using assumptions.
-"""
-            }
-        )
 
 
     async_ollama = ollama.AsyncClient()
@@ -166,6 +152,12 @@ Do not answer using assumptions.
     )
 
 
+    agent_state = {
+        "tools_used": [],
+        "tool_results": []
+    }
+
+
     tool_failures = 0
 
 
@@ -174,17 +166,27 @@ Do not answer using assumptions.
         for round_num in range(MAX_TOOL_ROUNDS):
 
             print(
-                f"\n===== Agent Round {round_num + 1} ====="
+                f"\n===== Agent Round {round_num+1} ====="
             )
+
+            start = time.time()
+
+            print("Calling Ollama...")
 
 
             response = await async_ollama.chat(
                 model="qwen2.5:7b",
+
                 messages=messages,
-                tools=[
-                    tool.tool
-                    for tool in TOOLS.values()
-                ],
+
+                tools=get_tool_schemas(),
+
+            )
+
+            print(
+                "Ollama finished:",
+                time.time() - start,
+                "seconds"
             )
 
 
@@ -192,8 +194,6 @@ Do not answer using assumptions.
                 response.message
             )
 
-
-            # Model finished gathering information
             if not response.message.tool_calls:
 
                 ai_reply = (
@@ -206,9 +206,11 @@ Do not answer using assumptions.
 
             for tool_call in response.message.tool_calls:
 
+
                 tool_name = (
                     tool_call.function.name
                 )
+
 
                 arguments = (
                     tool_call.function.arguments
@@ -216,15 +218,17 @@ Do not answer using assumptions.
 
 
                 print(
-                    f"Tool requested: {tool_name}"
+                    "Tool:",
+                    tool_name
                 )
 
                 print(
-                    f"Arguments: {arguments}"
+                    "Args:",
+                    arguments
                 )
 
 
-                tool_function = TOOLS.get(
+                tool_function = get_tool_function(
                     tool_name
                 )
 
@@ -232,7 +236,7 @@ Do not answer using assumptions.
                 if tool_function is None:
 
                     result = (
-                        f"Tool {tool_name} does not exist."
+                        f"Unknown tool: {tool_name}"
                     )
 
                     tool_failures += 1
@@ -245,6 +249,11 @@ Do not answer using assumptions.
                         result = await tool_function(
                             **arguments
                         )
+
+                        result = str(result)
+
+                        if len(result) > 3000:
+                            result = result[:3000] + "...truncated"
 
 
                         agent_state[
@@ -266,29 +275,30 @@ Do not answer using assumptions.
 
                     except Exception as e:
 
+                        result = (
+                            f"Tool failed: {e}"
+                        )
+
                         tool_failures += 1
 
-                        result = (
-                            f"Tool failed: {str(e)}"
-                        )
 
 
                 messages.append(
                     {
                         "role": "tool",
                         "name": tool_name,
-                        "content": str(result),
+                        "content": str(result)
                     }
                 )
 
 
+
             if tool_failures >= 3:
 
-                ai_reply = """
-I am currently unable to retrieve reliable live information.
-
-Please try again later.
-"""
+                ai_reply = (
+                    "I could not access "
+                    "the required information."
+                )
 
                 break
 
@@ -296,56 +306,10 @@ Please try again later.
 
         else:
 
-            ai_reply = """
-I was unable to finish gathering enough information.
-"""
-
-
-
-        # ==============================
-        # FINAL VALIDATION PASS
-        # ==============================
-
-        validation_prompt = f"""
-
-You are the final accuracy checker.
-
-Verify this answer:
-
-{ai_reply}
-
-
-Available verified tool data:
-
-{agent_state["tool_results"]}
-
-
-Rules:
-
-- Remove any unsupported facts.
-- Never invent locations, weather, prices, events, or businesses.
-- Only keep information supported by tool results.
-- If information is missing, say so.
-
-Return only the corrected final answer.
-
-"""
-
-
-        validation = await async_ollama.chat(
-            model="qwen2.5:7b",
-            messages=[
-                {
-                    "role": "system",
-                    "content": validation_prompt
-                }
-            ]
-        )
-
-
-        ai_reply = (
-            validation.message.content
-        )
+            ai_reply = (
+                "I reached my maximum "
+                "planning steps."
+            )
 
 
 
@@ -357,7 +321,7 @@ Return only the corrected final answer.
 
 
         print(
-            "Tools used:",
+            "TOOLS USED:",
             agent_state["tools_used"]
         )
 

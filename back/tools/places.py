@@ -8,23 +8,18 @@ async def search_places(
     limit: int = 5,
 ) -> str:
     """
-    Search for interesting places near a city.
+    Find interesting places near a city.
 
-    Args:
-        city: City or location name.
-        category: Type of place (tourism, museum, park, attraction).
-        limit: Maximum results.
-
-    Returns:
-        JSON string containing places.
+    Returns only concise verified place information
+    for the travel agent.
     """
 
-    limit = max(1, min(limit, 10))
+    limit = max(1, min(limit, 5))
 
-    async with httpx.AsyncClient() as client:
+    async with httpx.AsyncClient(timeout=15) as client:
 
         # -------------------------
-        # Geocode location
+        # Geocode city
         # -------------------------
         geo = await client.get(
             "https://geocoding-api.open-meteo.com/v1/search",
@@ -41,8 +36,10 @@ async def search_places(
 
         if not geo_data.get("results"):
             return json.dumps({
-                "error": f"Could not find {city}"
+                "success": False,
+                "error": f"Could not locate {city}"
             })
+
 
         location = geo_data["results"][0]
 
@@ -51,83 +48,107 @@ async def search_places(
 
 
         # -------------------------
-        # Search OpenStreetMap
+        # OpenStreetMap search
         # -------------------------
         query = f"""
         [out:json];
         (
           node["tourism"](around:5000,{lat},{lon});
-          node["leisure"="park"](around:5000,{lat},{lon});
           node["amenity"="museum"](around:5000,{lat},{lon});
+          node["leisure"="park"](around:5000,{lat},{lon});
           way["tourism"](around:5000,{lat},{lon});
         );
         out center;
         """
 
-        places_response = await client.post(
+
+        response = await client.post(
             "https://overpass-api.de/api/interpreter",
             data=query,
         )
 
-        places_response.raise_for_status()
+        response.raise_for_status()
 
-        data = places_response.json()
+        data = response.json()
 
 
-    results = []
+    places = []
 
-    for item in data.get("elements", [])[:limit]:
+    seen = set()
+
+
+    for item in data.get("elements", []):
 
         tags = item.get("tags", {})
 
         name = tags.get("name")
 
+
         if not name:
             continue
 
-        results.append(
+
+        # avoid duplicates
+        if name in seen:
+            continue
+
+        seen.add(name)
+
+
+        place_type = (
+            tags.get("tourism")
+            or tags.get("amenity")
+            or tags.get("leisure")
+            or "place"
+        )
+
+
+        places.append(
             {
                 "name": name,
-                "type": (
-                    tags.get("tourism")
-                    or tags.get("amenity")
-                    or tags.get("leisure")
-                ),
-                "latitude": item.get("lat")
-                or item.get("center", {}).get("lat"),
-                "longitude": item.get("lon")
-                or item.get("center", {}).get("lon"),
+                "type": place_type
             }
         )
 
 
+        if len(places) >= limit:
+            break
+
+
+
     return json.dumps(
         {
-            "location": city,
-            "places": results,
+            "success": True,
+            "city": city,
+            "count": len(places),
+            "places": places
         }
     )
-
 
 search_places.tool = {
     "type": "function",
     "function": {
         "name": "search_places",
-        "description": "Find tourist attractions, landmarks, museums, parks, and interesting places near a city.",
+        "description": (
+            "Find verified nearby attractions, museums, "
+            "parks, landmarks, and interesting places. "
+            "Use this when the user asks what to do, "
+            "things to see, or activities."
+        ),
         "parameters": {
             "type": "object",
             "properties": {
                 "city": {
                     "type": "string",
-                    "description": "City or location to search."
+                    "description": "City or travel destination."
                 },
                 "category": {
                     "type": "string",
-                    "description": "Type of place to find."
+                    "description": "Optional place category."
                 },
                 "limit": {
                     "type": "integer",
-                    "description": "Maximum number of results."
+                    "description": "Number of places to return, maximum 5."
                 }
             },
             "required": [

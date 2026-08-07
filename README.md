@@ -170,47 +170,49 @@ Authenticated user data and conversation history are persisted using AWS DynamoD
 ## Installation
 ### Backend Setup
 Create a virtual environment:
-```http
+```
 python -m venv venv
 
 source venv/bin/activate
 ```
 ### Install dependencies:
-
+```
 pip install -r requirements.txt
-Install Ollama Model
-
-### Install Ollama and download the required model:
-
+```
+###Install Ollama Model
+```
 ollama pull qwen2.5:7b
-
+```
 ### Verify installation:
-
+```
 ollama list
+```
 ### Frontend Setup
 
 Navigate to the frontend directory:
-
+```
 cd frontend
-
+```
 ### Install dependencies:
-
+```
 npm install
-
+```
 ### Run development server:
-
+```
 npm run dev
+```
 ---
 ## Running the Application
 
 ### Start Ollama:
-
+```
 ollama run qwen2.5:7b
-
+```
 ### Start FastAPI backend:
-
+```
 uvicorn main:app --reload
-
+```
 ### Start React frontend:
-
+```
 npm run dev
+```

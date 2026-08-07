@@ -35,7 +35,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-MAX_TOOL_ROUNDS = 8
+MAX_TOOL_ROUNDS = 5
 
 @app.get("/api/auth/login")
 def login_with_google():
@@ -116,7 +116,6 @@ async def chat(
 
     user_id = user["user_id"]
 
-
     save_message(
         user_id,
         "user",
@@ -160,6 +159,8 @@ async def chat(
 
     tool_failures = 0
 
+    tool_usage_count = {}
+
 
     try:
 
@@ -169,6 +170,7 @@ async def chat(
                 f"\n===== Agent Round {round_num+1} ====="
             )
 
+
             start = time.time()
 
             print("Calling Ollama...")
@@ -176,12 +178,14 @@ async def chat(
 
             response = await async_ollama.chat(
                 model="qwen2.5:7b",
-
                 messages=messages,
-
                 tools=get_tool_schemas(),
-
+                options={
+                    "temperature": 0.2,
+                    "num_ctx": 4096
+                }
             )
+
 
             print(
                 "Ollama finished:",
@@ -194,18 +198,16 @@ async def chat(
                 response.message
             )
 
+
+            # Model wants to answer
             if not response.message.tool_calls:
 
-                ai_reply = (
-                    response.message.content
-                )
-
+                ai_reply = response.message.content
                 break
 
 
 
             for tool_call in response.message.tool_calls:
-
 
                 tool_name = (
                     tool_call.function.name
@@ -215,6 +217,22 @@ async def chat(
                 arguments = (
                     tool_call.function.arguments
                 )
+
+
+                # prevent infinite repeat calls
+                tool_usage_count[tool_name] = (
+                    tool_usage_count.get(tool_name, 0) + 1
+                )
+
+
+                if tool_usage_count[tool_name] > 1:
+
+                    print(
+                        f"Skipping duplicate tool: {tool_name}"
+                    )
+
+                    continue
+
 
 
                 print(
@@ -250,22 +268,25 @@ async def chat(
                             **arguments
                         )
 
+
                         result = str(result)
 
-                        if len(result) > 3000:
-                            result = result[:3000] + "...truncated"
+
+                        # keep context small
+                        if len(result) > 2000:
+
+                            result = (
+                                result[:2000]
+                                + "...truncated"
+                            )
 
 
-                        agent_state[
-                            "tools_used"
-                        ].append(
+                        agent_state["tools_used"].append(
                             tool_name
                         )
 
 
-                        agent_state[
-                            "tool_results"
-                        ].append(
+                        agent_state["tool_results"].append(
                             {
                                 "tool": tool_name,
                                 "result": result
@@ -275,11 +296,11 @@ async def chat(
 
                     except Exception as e:
 
+                        tool_failures += 1
+
                         result = (
                             f"Tool failed: {e}"
                         )
-
-                        tool_failures += 1
 
 
 
@@ -287,29 +308,63 @@ async def chat(
                     {
                         "role": "tool",
                         "name": tool_name,
-                        "content": str(result)
+                        "content": result
                     }
                 )
 
 
+            # after tools, tell model to use results
+            messages.append(
+                {
+                    "role": "system",
+                    "content": """
+Use the tool results above.
 
-            if tool_failures >= 3:
+Create the answer now.
 
-                ai_reply = (
-                    "I could not access "
-                    "the required information."
-                )
-
-                break
+Only include verified information.
+If something was unavailable, say so.
+Do not call the same tool again.
+"""
+                }
+            )
 
 
 
         else:
 
-            ai_reply = (
-                "I reached my maximum "
-                "planning steps."
-            )
+            # max rounds reached
+            if agent_state["tool_results"]:
+
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": """
+Summarize the verified information gathered so far.
+Do not request more tools.
+"""
+                    }
+                )
+
+
+                final = await async_ollama.chat(
+                    model="qwen2.5:7b",
+                    messages=messages,
+                    options={
+                        "temperature":0.2
+                    }
+                )
+
+
+                ai_reply = (
+                    final.message.content
+                )
+
+            else:
+
+                ai_reply = (
+                    "I could not retrieve verified information."
+                )
 
 
 

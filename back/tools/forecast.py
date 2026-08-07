@@ -105,7 +105,7 @@ get_forecast.tool = {
             "properties": {
                 "city": {
                     "type": "string",
-                    "description": "City name",
+                    "description": "City or area for weather forecast."
                 },
                 "days": {
                     "type": "integer",

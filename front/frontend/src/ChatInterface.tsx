@@ -80,7 +80,7 @@ export default function ChatInterface({ token, setToken }: ChatInterfaceProps) {
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" />
           <h1 className="text-lg font-semibold text-slate-200 tracking-wide">
-            Qwen Weather Assistant
+            Qwen Travel Assistant
           </h1>
         </div>
         <div className="flex items-center gap-4">

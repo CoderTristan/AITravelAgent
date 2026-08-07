@@ -140,7 +140,7 @@ search_places.tool = {
             "properties": {
                 "city": {
                     "type": "string",
-                    "description": "City or travel destination."
+                    "description": "City, region, state, or travel area."
                 },
                 "category": {
                     "type": "string",

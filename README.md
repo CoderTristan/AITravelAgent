@@ -161,60 +161,56 @@ Agent Conversation Memory
 Authenticated user data and conversation history are persisted using AWS DynamoDB.
 ---
 ## Requirements
-Python 3.11+
-Node.js 18+
-AWS DynamoDB
-Ollama
-Qwen2.5:7b
-Installation
-Clone Repository
-git clone https://github.com/CoderTristan/AIAgent.git
-
-cd AIAgent
-Backend Setup
-
+- Python 3.11+
+- Node.js 18+
+- AWS DynamoDB
+- Ollama
+- Qwen2.5:7b
+---
+## Installation
+### Backend Setup
 Create a virtual environment:
-
+```http
 python -m venv venv
 
 source venv/bin/activate
-
-Install dependencies:
+```
+### Install dependencies:
 
 pip install -r requirements.txt
 Install Ollama Model
 
-Install Ollama and download the required model:
+### Install Ollama and download the required model:
 
 ollama pull qwen2.5:7b
 
-Verify installation:
+### Verify installation:
 
 ollama list
-Frontend Setup
+### Frontend Setup
 
 Navigate to the frontend directory:
 
 cd frontend
 
-Install dependencies:
+### Install dependencies:
 
 npm install
 
-Run development server:
+### Run development server:
 
 npm run dev
 ---
 ## Running the Application
 
-Start Ollama:
+### Start Ollama:
 
-ollama serve
+ollama run qwen2.5:7b
 
-Start FastAPI backend:
+### Start FastAPI backend:
 
 uvicorn main:app --reload
 
-Start React frontend:
+### Start React frontend:
 
 npm run dev

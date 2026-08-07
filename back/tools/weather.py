@@ -50,7 +50,6 @@ async def get_live_weather(city: str) -> str:
 
 
 
-# Ollama tool schema
 get_live_weather.tool = {
     "type": "function",
     "function": {

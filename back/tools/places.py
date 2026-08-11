@@ -18,9 +18,6 @@ async def search_places(
 
     async with httpx.AsyncClient(timeout=15) as client:
 
-        # -------------------------
-        # Geocode city
-        # -------------------------
         geo = await client.get(
             "https://geocoding-api.open-meteo.com/v1/search",
             params={
@@ -47,9 +44,6 @@ async def search_places(
         lon = location["longitude"]
 
 
-        # -------------------------
-        # OpenStreetMap search
-        # -------------------------
         query = f"""
         [out:json];
         (

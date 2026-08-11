@@ -173,8 +173,6 @@ async def chat(
 
             start = time.time()
 
-            print("Calling Ollama...")
-
 
             response = await async_ollama.chat(
                 model="qwen2.5:7b",
@@ -199,7 +197,6 @@ async def chat(
             )
 
 
-            # Model wants to answer
             if not response.message.tool_calls:
 
                 ai_reply = response.message.content
@@ -219,7 +216,6 @@ async def chat(
                 )
 
 
-                # prevent infinite repeat calls
                 tool_usage_count[tool_name] = (
                     tool_usage_count.get(tool_name, 0) + 1
                 )
@@ -312,8 +308,6 @@ async def chat(
                     }
                 )
 
-
-            # after tools, tell model to use results
             messages.append(
                 {
                     "role": "system",
@@ -333,7 +327,6 @@ Do not call the same tool again.
 
         else:
 
-            # max rounds reached
             if agent_state["tool_results"]:
 
                 messages.append(

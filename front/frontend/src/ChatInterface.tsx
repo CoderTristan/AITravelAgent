@@ -75,7 +75,7 @@ export default function ChatInterface({ token, setToken }: ChatInterfaceProps) {
 
   return (
     <div className="flex flex-col h-screen bg-slate-950 text-slate-100 font-sans">
-      {/* Top Header */}
+
       <header className="flex items-center justify-between px-6 py-4 border-b border-slate-800/80 bg-slate-950/50 backdrop-blur-md">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full bg-emerald-400 animate-pulse" />
@@ -99,7 +99,6 @@ export default function ChatInterface({ token, setToken }: ChatInterfaceProps) {
         </div>
       </header>
 
-      {/* Main Chat Body */}
       <main className="flex-1 overflow-y-auto px-4 py-6">
         <div className="max-w-3xl mx-auto flex flex-col gap-6">
           {messages.length === 0 ? (
@@ -146,7 +145,6 @@ export default function ChatInterface({ token, setToken }: ChatInterfaceProps) {
         </div>
       </main>
 
-      {/* Floating Bottom Input Bar */}
       <footer className="p-4 bg-slate-950/80 backdrop-blur-md">
         <div className="max-w-3xl mx-auto">
           <form

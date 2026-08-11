@@ -17,12 +17,8 @@ async def get_forecast(
         JSON string containing the forecast.
     """
 
-    # Clamp to Open-Meteo limits
     days = max(1, min(days, 7))
-
-    # -------------------------
-    # Geocode city
-    # -------------------------
+    # Get forecast
     async with httpx.AsyncClient() as client:
         geo = await client.get(
             "https://geocoding-api.open-meteo.com/v1/search",
@@ -50,9 +46,6 @@ async def get_forecast(
         resolved_name = location["name"]
         country = location.get("country", "")
 
-        # -------------------------
-        # Forecast
-        # -------------------------
         weather = await client.get(
             "https://api.open-meteo.com/v1/forecast",
             params={

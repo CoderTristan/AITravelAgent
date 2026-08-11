@@ -1,8 +1,8 @@
 # AI Travel Agent
 
-AI-powered travel assistant built with **FastAPI, React, TypeScript, AWS DynamoDB, Google OAuth 2.0, Ollama Qwen2.5:7b, and external APIs**.
+AI-powered travel assistant built with FastAPI, React, TypeScript, AWS DynamoDB, Google OAuth 2.0, Ollama Qwen2.5:7b, and external APIs.
 
-Designed to provide conversational travel planning through a local LLM-powered agent capable of retrieving real-time travel data, maintaining conversation memory, and executing multi-step planning workflows.
+Designed to provide conversational travel planning through a local LLM-powered agent capable of retrieving travel data, maintaining conversation memory, and running multi-step planning workflows.
 
 > *Combines local AI inference with external travel APIs to deliver*
 > *personalized travel recommendations, weather insights, location discovery,*

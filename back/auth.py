@@ -20,7 +20,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24 * 7
 security = HTTPBearer()
 
 async def exchange_code_for_google_user(code: str) -> dict:
-    """Secure async exchange of OAuth code for user profile."""
     token_url = "https://oauth2.googleapis.com/token"
     data = {
         "code": code,
@@ -31,14 +30,12 @@ async def exchange_code_for_google_user(code: str) -> dict:
     }
     
     async with httpx.AsyncClient() as client:
-        # 1. Fetch short-lived Google token
         token_response = await client.post(token_url, data=data)
         if token_response.status_code != 200:
             raise HTTPException(status_code=400, detail="Failed to exchange OAuth code")
             
         access_token = token_response.json().get("access_token")
         
-        # 2. Fetch User Profile
         userinfo_url = "https://www.googleapis.com/oauth2/v2/userinfo"
         user_response = await client.get(userinfo_url, headers={"Authorization": f"Bearer {access_token}"})
         
@@ -48,14 +45,12 @@ async def exchange_code_for_google_user(code: str) -> dict:
         return user_response.json()
 
 def create_access_token(data: dict) -> str:
-    """Mints the custom App JWT for local session management."""
     to_encode = data.copy()
     expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     to_encode.update({"exp": expire})
     return jwt.encode(to_encode, JWT_SECRET, algorithm=ALGORITHM)
 
 def verify_jwt_token(credentials: HTTPAuthorizationCredentials = Security(security)) -> dict:
-    """Dependency injection to protect FastAPI routes and extract user context."""
     token = credentials.credentials
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])

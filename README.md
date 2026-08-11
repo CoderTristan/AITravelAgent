@@ -4,7 +4,7 @@ AI-powered travel assistant built with FastAPI, React, TypeScript, AWS DynamoDB,
 
 Designed to provide conversational travel planning through a local LLM-powered agent capable of retrieving travel data, maintaining conversation memory, and running multi-step planning workflows.
 
-> *Combines local AI inference with external travel APIs to deliver*
+> *Combines local AI inference with external travel APIs to create*
 > *personalized travel recommendations, weather insights, location discovery,*
 > *and context-aware trip planning through an intelligent agent system.*
 
@@ -13,13 +13,13 @@ Designed to provide conversational travel planning through a local LLM-powered a
 ## Features
 
 - AI travel assistant powered by Ollama Qwen2.5:7b
-- Local LLM inference with function calling capabilities
-- Multi-step agent planning and reasoning workflows
+- Local LLM inference with function calling abilities
+- Multi-step agent planning and reasoning
 - Persistent conversation memory using AWS DynamoDB
 - Google OAuth 2.0 authentication
 - Real-time weather and forecast retrieval
 - Geocoding and location discovery integration
-- Async FastAPI backend architecture
+- FastAPI backend architecture
 - React + TypeScript conversational interface
 
 ---
@@ -65,12 +65,12 @@ Local LLM (Qwen2.5:7b)
       └── Generate final response
 ```
 
-The AI agent uses function calling to determine when additional information is required. External tools are executed asynchronously, and retrieved data is combined with conversation context before generating a response.
+The AI agent uses function calling to determine when additional information is needed. External tools are executed asynchronously, and retrieved data is combined with context before generating a response.
 ---
 ## Engineering Challenges
-- Designed an asynchronous agent architecture capable of handling multi-step planning workflows
+- Designed an agent architecture capable of handling multi-step planning workflows
 - Integrated 5+ real-time APIs for weather, forecasting, geocoding, and location discovery
-- Implemented LLM function calling for dynamic tool execution
+- Implemented LLM function calling for tool execution
 - Built persistent conversation memory using AWS DynamoDB
 - Connected local LLM inference with cloud-based application infrastructure
 - Implemented Google OAuth 2.0 authentication and user sessions
@@ -89,9 +89,8 @@ The AI agent uses function calling to determine when additional information is r
 ### AI Infrastructure
 - Local LLM inference
 - Function calling
-- Agent-based reasoning
 - Conversation memory
-- External Integrations
+### External Integrations
 - Weather APIs
 - Forecast APIs
 - Geocoding APIs
@@ -106,7 +105,6 @@ POST /api/v1/chat
 ```
 **Authentication:** Google OAuth 2.0
 
-**Content-Type:** application/json
 
 ### Example Request:
 
@@ -134,12 +132,12 @@ Returns previous messages and stored agent context for the authenticated user.
 
 ## Agent Capabilities
 ### Capability	Description
-- Travel Planning	Creates personalized multi-step itineraries
-- Weather Retrieval	Retrieves current weather and forecasts
-- Location Discovery	Finds destinations, attractions, and points of interest
-- Geocoding	Converts locations into geographic coordinates
-- Conversation Memory	Maintains previous user interactions
-- Tool Calling	Dynamically executes external API functions
+- Travel Planning:	Creates personalized multi-step itineraries
+- Weather Retrieval:	Retrieves current weather and forecasts
+- Location Discovery:	Finds destinations, attractions, and points of interest
+- Geocoding:	Converts locations into geographic coordinates
+- Conversation Memory:	Maintains previous user interactions
+- Tool Calling: Dynamically executes external API functions
 ---
 ## Authentication
 Authentication is handled through Google OAuth 2.0.
@@ -164,8 +162,7 @@ Authenticated user data and conversation history are persisted using AWS DynamoD
 - Python 3.11+
 - Node.js 18+
 - AWS DynamoDB
-- Ollama
-- Qwen2.5:7b
+- Ollama Qwen2.5:7b
 ---
 ## Installation
 ### Backend Setup
